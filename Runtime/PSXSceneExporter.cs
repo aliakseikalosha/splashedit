@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Splashedit.RuntimeCode;
 using UnityEditor;
 using UnityEngine;
 
@@ -83,6 +84,10 @@ namespace SplashEdit.RuntimeCode
             string path = EditorUtility.SaveFilePanel("Select Output File", "", "output", "bin");
             int totalFaces = 0;
 
+            // Lists for lua data offsets.
+            List<long> luaOffsetPlaceholderPositions = new List<long>();
+            List<long> luaDataOffsets = new List<long>();
+
             // Lists for mesh data offsets.
             List<long> meshOffsetPlaceholderPositions = new List<long>();
             List<long> meshDataOffsets = new List<long>();
@@ -100,6 +105,7 @@ namespace SplashEdit.RuntimeCode
             List<long> navmeshDataOffsets = new List<long>();
 
             int clutCount = 0;
+            List<LuaFile> luaFiles = new List<LuaFile>();
 
             // Cluts
             foreach (TextureAtlas atlas in _atlases)
@@ -113,12 +119,26 @@ namespace SplashEdit.RuntimeCode
                 }
             }
 
+            // Lua files 
+            foreach (PSXObjectExporter exporter in _exporters)
+            {
+                if (exporter.luaFile != null)
+                {
+                    //if not contains
+                    if (!luaFiles.Contains(exporter.luaFile))
+                    {
+                        luaFiles.Add(exporter.luaFile);
+                    }
+                }
+            }
+
             using (BinaryWriter writer = new BinaryWriter(File.Open(path, FileMode.Create)))
             {
                 // Header
                 writer.Write('S'); // 1 byte                                                                    // 1
                 writer.Write('P'); // 1 byte                                                                    // 2 
                 writer.Write((ushort)1); // 2 bytes - version                                                   // 4
+                writer.Write((ushort)luaFiles.Count); // 2 bytes - padding                                                      // 6
                 writer.Write((ushort)_exporters.Length); // 2 bytes                                             // 6
                 writer.Write((ushort)_navmeshes.Length);                                                        // 8
                 writer.Write((ushort)_atlases.Length); // 2 bytes                                               // 10
@@ -134,6 +154,16 @@ namespace SplashEdit.RuntimeCode
                 writer.Write((ushort)PSXTrig.ConvertCoordinateToPSX(_playerHeight, GTEScaling));                // 26
 
                 writer.Write((ushort)0);
+                writer.Write((ushort)0);
+
+                // Lua file section
+                foreach (LuaFile luaFile in luaFiles)
+                {
+                    // Write placeholder for lua file data offset and record its position.
+                    luaOffsetPlaceholderPositions.Add(writer.BaseStream.Position);
+                    writer.Write((int)0); // 4-byte placeholder for mesh data offset.
+                    writer.Write((uint)luaFile.luaScript.text.Length);
+                }
 
                 // GameObject section (exporters)
                 foreach (PSXObjectExporter exporter in _exporters)
@@ -159,7 +189,15 @@ namespace SplashEdit.RuntimeCode
                     writer.Write((int)rotationMatrix[2, 2]);
 
                     writer.Write((ushort)exporter.Mesh.Triangles.Count);
-                    writer.Write((ushort)0);
+                    if (exporter.luaFile != null)
+                    {
+                        int index = luaFiles.IndexOf(exporter.luaFile);
+                        writer.Write((short)index);
+                    }
+                    else
+                    {
+                        writer.Write((short)-1);
+                    }
                 }
 
                 // Navmesh metadata section
@@ -204,6 +242,17 @@ namespace SplashEdit.RuntimeCode
                 }
 
                 // Start of data section
+
+                // Lua data section: Write lua file data for each exporter.
+                foreach (LuaFile luaFile in luaFiles)
+                {
+                    AlignToFourBytes(writer);
+                    // Record the current offset for this lua file's data.
+                    long luaDataOffset = writer.BaseStream.Position;
+                    luaDataOffsets.Add(luaDataOffset);
+
+                    writer.Write(luaFile.luaScript.bytes);
+                }
 
                 // Mesh data section: Write mesh data for each exporter.
                 foreach (PSXObjectExporter exporter in _exporters)
@@ -335,6 +384,20 @@ namespace SplashEdit.RuntimeCode
                         }
                     }
 
+                }
+
+                // Bacfill the lua data offsets into the metadata section.
+                if (luaOffsetPlaceholderPositions.Count == luaDataOffsets.Count)
+                {
+                    for (int i = 0; i < luaOffsetPlaceholderPositions.Count; i++)
+                    {
+                        writer.Seek((int)luaOffsetPlaceholderPositions[i], SeekOrigin.Begin);
+                        writer.Write((int)luaDataOffsets[i]);
+                    }
+                }
+                else
+                {
+                    Debug.LogError("Mismatch between metadata lua offset placeholders and lua data blocks!");
                 }
 
                 // Backfill the mesh data offsets into the metadata section.

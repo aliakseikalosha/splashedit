@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Splashedit.RuntimeCode;
 using UnityEngine;
 
 namespace SplashEdit.RuntimeCode
@@ -7,6 +8,7 @@ namespace SplashEdit.RuntimeCode
     public class PSXObjectExporter : MonoBehaviour
     {
         public PSXBPP BitDepth = PSXBPP.TEX_8BIT; // Defines the bit depth of the texture (e.g., 4BPP, 8BPP)
+        public LuaFile luaFile;
 
         public List<PSXTexture2D> Textures { get; set; } = new List<PSXTexture2D>(); // Stores the converted PlayStation-style texture
         public PSXMesh Mesh { get; set; } // Stores the converted PlayStation-style mesh

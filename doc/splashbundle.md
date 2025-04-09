@@ -10,24 +10,32 @@ All numeric values are stored in little‐endian format. All offsets are counted
 | ------ | ---- | ------ | ----------------------------------- |
 | 0x00   | 2    | char   | `'SP'` – File magic                 |
 | 0x02   | 2    | uint16 | Version number                      |
-| 0x04   | 2    | uint16 | Number of GameObjects               |
-| 0x06   | 2    | uint16 | Number of Navmeshes                 |
-| 0x08   | 2    | uint16 | Number of Texture Atlases           |
-| 0x0A   | 2    | uint16 | Number of CLUTs                     |
-| 0x0C   | 2    | uint16 | Player Start X                      |
-| 0x0E   | 2    | uint16 | Player Start Y                      |
-| 0x10   | 2    | uint16 | Player Start Z                      |
-| 0x12   | 2    | uint16 | Player Rotation X                   |
-| 0x14   | 2    | uint16 | Player Rotation Y                   |
-| 0x16   | 2    | uint16 | Player Rotation Z                   |
-| 0x18   | 2    | uint16 | Player Height                       |
-| 0x1A   | 2    | uint16 | Reserved (always 0)                 |
+| 0x04   | 2    | uint16 | Number of Lua Files                 |
+| 0x06   | 2    | uint16 | Number of GameObjects               |
+| 0x08   | 2    | uint16 | Number of Navmeshes                 |
+| 0x0A   | 2    | uint16 | Number of Texture Atlases           |
+| 0x0C   | 2    | uint16 | Number of CLUTs                     |
+| 0x0E   | 2    | uint16 | Player Start X (Fixed-point)        |
+| 0x10   | 2    | uint16 | Player Start Y (Fixed-point)        |
+| 0x12   | 2    | uint16 | Player Start Z (Fixed-point)        |
+| 0x14   | 2    | uint16 | Player Rotation X (Fixed-point)     |
+| 0x16   | 2    | uint16 | Player Rotation Y (Fixed-point)     |
+| 0x18   | 2    | uint16 | Player Rotation Z (Fixed-point)     |
+| 0x1A   | 2    | uint16 | Player Height (Fixed-point)         |
+| 0x1C   | 4    | uint32 | Reserved (always 0)                 |
 
 ---
 
 ## 2. Metadata Section
 
-### 2.1 GameObject Descriptors (56 bytes each)
+### 2.1 Lua File Descriptors (8 bytes each)
+
+| Offset (per entry) | Size | Type   | Description                       |
+| ------------------ | ---- | ------ | --------------------------------- |
+| 0x00               | 4    | uint32 | Lua File Data Offset              |
+| 0x04               | 4    | uint32 | Lua File Size                     |
+
+### 2.2 GameObject Descriptors (56 bytes each)
 
 | Offset (per entry) | Size | Type     | Description                       |
 | ------------------ | ---- | -------- | --------------------------------- |
@@ -37,21 +45,17 @@ All numeric values are stored in little‐endian format. All offsets are counted
 | 0x0C               | 4    | int32    | Z position (Fixed-point)          |
 | 0x10               | 36   | int32[9] | 3×3 Rotation Matrix (Fixed-point) |
 | 0x34               | 2    | uint16   | Triangle count                    |
-| 0x36               | 2    | int16    | Padding                           |
+| 0x36               | 2    | int16    | Lua File Index (-1 if none)       |
 
-> Mesh data for each GameObject is located at `meshDataOffset`.
-
-### 2.2 Navmesh Descriptors (8 bytes each)
+### 2.3 Navmesh Descriptors (8 bytes each)
 
 | Offset (per entry) | Size | Type   | Description                       |
 | ------------------ | ---- | ------ | --------------------------------- |
 | 0x00               | 4    | uint32 | Navmesh Data Offset               |
-| 0x04               | 2    | int16  | Triangle count                    |
-| 0x06               | 2    | int16  | Padding                           |
+| 0x04               | 2    | uint16 | Triangle count                    |
+| 0x06               | 2    | uint16 | Padding                           |
 
-> Each triangle in a navmesh is defined by 3 `int16` vertices (6 bytes per vertex).
-
-### 2.3 Texture Atlas Descriptors (12 bytes each)
+### 2.4 Texture Atlas Descriptors (12 bytes each)
 
 | Offset (per entry) | Size | Type   | Description                      |
 | ------------------ | ---- | ------ | -------------------------------- |
@@ -61,9 +65,7 @@ All numeric values are stored in little‐endian format. All offsets are counted
 | 0x08               | 2    | uint16 | Atlas Position X (VRAM origin)   |
 | 0x0A               | 2    | uint16 | Atlas Position Y (VRAM origin)   |
 
-> Pixel data is stored as `uint16[width * height]`.
-
-### 2.4 CLUT Descriptors (12 bytes each)
+### 2.5 CLUT Descriptors (12 bytes each)
 
 | Offset (per entry) | Size | Type   | Description                                           |
 | ------------------ | ---- | ------ | ----------------------------------------------------- |
@@ -73,20 +75,24 @@ All numeric values are stored in little‐endian format. All offsets are counted
 | 0x08               | 2    | uint16 | Palette entry count                                   |
 | 0x0A               | 2    | uint16 | Padding                                               |
 
-> CLUT pixel data is stored as `uint16[length]`.
-
 ---
 
 ## 3. Data Section
 
-### 3.1 Mesh Data Block (per GameObject)
+### 3.1 Lua Data Block
+
+Each Lua file is stored as raw bytes. The size of each Lua file is specified in the Lua File Descriptor.
+
+---
+
+### 3.2 Mesh Data Block (per GameObject)
 
 Each mesh is made of triangles:
 
 **Triangle Layout (52 bytes):**
 
 | Field               | Size | Description                                         |
-| -------------------|------|-----------------------------------------------------|
+| ------------------- |------|-----------------------------------------------------|
 | Vertex v0          | 6    | x, y, z (int16)                                     |
 | Vertex v1          | 6    | x, y, z (int16)                                     |
 | Vertex v2          | 6    | x, y, z (int16)                                     |
@@ -105,20 +111,27 @@ Each mesh is made of triangles:
 
 ---
 
-### 3.2 Navmesh Data Block
+### 3.3 Navmesh Data Block
 
 Each triangle is 3 vertices (`int16` x/y/z), total 18 bytes per triangle.
 
 ---
 
-### 3.3 Texture Atlas Data Block
+### 3.4 Texture Atlas Data Block
 
 Pixel data stored as `uint16[width * height]`.
 
 ---
 
-### 3.4 CLUT Data Block
+### 3.5 CLUT Data Block
 
 Pixel data stored as `uint16[length]`.
 
 ---
+
+## Notes
+
+- All offsets are aligned to 4-byte boundaries.
+- Fixed-point values are scaled by the `GTEScaling` factor.
+- Lua file indices in GameObject descriptors are `-1` if no Lua file is associated with the object.
+- Navmesh triangles are stored as raw vertex data without additional attributes.
