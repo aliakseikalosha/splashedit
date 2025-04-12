@@ -39,7 +39,7 @@ namespace SplashEdit.RuntimeCode
             for (int i = 0; i < _exporters.Length; i++)
             {
                 PSXObjectExporter exp = _exporters[i];
-                EditorUtility.DisplayProgressBar($"{nameof(PSXSceneExporter)}", $"Export {nameof(PSXObjectExporter)}", ((float)i)/ _exporters.Length);
+                EditorUtility.DisplayProgressBar($"{nameof(PSXSceneExporter)}", $"Export {nameof(PSXObjectExporter)}", ((float)i) / _exporters.Length);
                 exp.CreatePSXTextures2D();
                 exp.CreatePSXMesh(GTEScaling);
             }
@@ -87,29 +87,23 @@ namespace SplashEdit.RuntimeCode
 
         void ExportFile()
         {
-
             string path = EditorUtility.SaveFilePanel("Select Output File", "", "output", "bin");
             int totalFaces = 0;
 
             // Lists for lua data offsets.
-            List<long> luaOffsetPlaceholderPositions = new List<long>();
-            List<long> luaDataOffsets = new List<long>();
+            OffsetData luaOffset = new();
 
             // Lists for mesh data offsets.
-            List<long> meshOffsetPlaceholderPositions = new List<long>();
-            List<long> meshDataOffsets = new List<long>();
+            OffsetData meshOffset = new();
 
             // Lists for atlas data offsets.
-            List<long> atlasOffsetPlaceholderPositions = new List<long>();
-            List<long> atlasDataOffsets = new List<long>();
+            OffsetData atlasOffset = new();
 
             // Lists for clut data offsets.
-            List<long> clutOffsetPlaceholderPositions = new List<long>();
-            List<long> clutDataOffsets = new List<long>();
+            OffsetData clutOffset = new();
 
             // Lists for navmesh data offsets.
-            List<long> navmeshOffsetPlaceholderPositions = new List<long>();
-            List<long> navmeshDataOffsets = new List<long>();
+            OffsetData navmeshOffset = new();
 
             int clutCount = 0;
             List<LuaFile> luaFiles = new List<LuaFile>();
@@ -167,7 +161,7 @@ namespace SplashEdit.RuntimeCode
                 foreach (LuaFile luaFile in luaFiles)
                 {
                     // Write placeholder for lua file data offset and record its position.
-                    luaOffsetPlaceholderPositions.Add(writer.BaseStream.Position);
+                    luaOffset.OffsetPlaceholderPositions.Add(writer.BaseStream.Position);
                     writer.Write((int)0); // 4-byte placeholder for mesh data offset.
                     writer.Write((uint)luaFile.LuaScript.Length);
                 }
@@ -176,7 +170,7 @@ namespace SplashEdit.RuntimeCode
                 foreach (PSXObjectExporter exporter in _exporters)
                 {
                     // Write placeholder for mesh data offset and record its position.
-                    meshOffsetPlaceholderPositions.Add(writer.BaseStream.Position);
+                    meshOffset.OffsetPlaceholderPositions.Add(writer.BaseStream.Position);
                     writer.Write((int)0); // 4-byte placeholder for mesh data offset.
 
                     // Write object's transform
@@ -211,7 +205,7 @@ namespace SplashEdit.RuntimeCode
                 foreach (PSXNavMesh navmesh in _navmeshes)
                 {
                     // Write placeholder for navmesh raw data offset.
-                    navmeshOffsetPlaceholderPositions.Add(writer.BaseStream.Position);
+                    navmeshOffset.OffsetPlaceholderPositions.Add(writer.BaseStream.Position);
                     writer.Write((int)0); // 4-byte placeholder for navmesh data offset.
 
                     writer.Write((ushort)navmesh.Navmesh.Count);
@@ -222,7 +216,7 @@ namespace SplashEdit.RuntimeCode
                 foreach (TextureAtlas atlas in _atlases)
                 {
                     // Write placeholder for texture atlas raw data offset.
-                    atlasOffsetPlaceholderPositions.Add(writer.BaseStream.Position);
+                    atlasOffset.OffsetPlaceholderPositions.Add(writer.BaseStream.Position);
                     writer.Write((int)0); // 4-byte placeholder for atlas data offset.
 
                     writer.Write((ushort)atlas.Width);
@@ -238,7 +232,7 @@ namespace SplashEdit.RuntimeCode
                     {
                         if (texture.ColorPalette != null)
                         {
-                            clutOffsetPlaceholderPositions.Add(writer.BaseStream.Position);
+                            clutOffset.OffsetPlaceholderPositions.Add(writer.BaseStream.Position);
                             writer.Write((int)0); // 4-byte placeholder for clut data offset.
                             writer.Write((ushort)texture.ClutPackingX); // 2 bytes
                             writer.Write((ushort)texture.ClutPackingY); // 2 bytes
@@ -256,9 +250,41 @@ namespace SplashEdit.RuntimeCode
                     AlignToFourBytes(writer);
                     // Record the current offset for this lua file's data.
                     long luaDataOffset = writer.BaseStream.Position;
-                    luaDataOffsets.Add(luaDataOffset);
+                    luaOffset.DataOffsets.Add(luaDataOffset);
 
                     writer.Write(Encoding.UTF8.GetBytes(luaFile.LuaScript));
+                }
+
+                void writeVertexPosition(PSXVertex v)
+                {
+                    writer.Write((short)v.vx);
+                    writer.Write((short)v.vy);
+                    writer.Write((short)v.vz);
+                }
+                void writeVertexNormals(PSXVertex v)
+                {
+                    writer.Write((short)v.nx);
+                    writer.Write((short)v.ny);
+                    writer.Write((short)v.nz);
+                }
+                void writeVertexColor(PSXVertex v)
+                {
+                    writer.Write((byte)v.r);
+                    writer.Write((byte)v.g);
+                    writer.Write((byte)v.b);
+                    writer.Write((byte)0); // padding
+                }
+                void writeVertexUV(PSXVertex v, PSXTexture2D t, int expander)
+                {
+                    writer.Write((byte)(v.u + t.PackingX * expander));
+                    writer.Write((byte)(v.v + t.PackingY));
+                }
+                void foreachVertexDo(Tri tri, Action<PSXVertex> action)
+                {
+                    for (int i = 0; i < tri.Vertexes.Length; i++)
+                    {
+                        action(tri.Vertexes[i]);
+                    }
                 }
 
                 // Mesh data section: Write mesh data for each exporter.
@@ -267,41 +293,11 @@ namespace SplashEdit.RuntimeCode
                     AlignToFourBytes(writer);
                     // Record the current offset for this exporter's mesh data.
                     long meshDataOffset = writer.BaseStream.Position;
-                    meshDataOffsets.Add(meshDataOffset);
+                    meshOffset.DataOffsets.Add(meshDataOffset);
 
                     totalFaces += exporter.Mesh.Triangles.Count;
 
-                    void writeVertexPosition(PSXVertex v)
-                    {
-                        writer.Write((short)v.vx);
-                        writer.Write((short)v.vy);
-                        writer.Write((short)v.vz);
-                    }
-                    void writeVertexNormals(PSXVertex v)
-                    {
-                        writer.Write((short)v.nx);
-                        writer.Write((short)v.ny);
-                        writer.Write((short)v.nz);
-                    }
-                    void writeVertexColor(PSXVertex v)
-                    {
-                        writer.Write((byte)v.r);
-                        writer.Write((byte)v.g);
-                        writer.Write((byte)v.b);
-                        writer.Write((byte)0); // padding
-                    }
-                    void writeVertexUV(PSXVertex v, PSXTexture2D t, int expander)
-                    {
-                        writer.Write((byte)(v.u + t.PackingX * expander));
-                        writer.Write((byte)(v.v + t.PackingY));
-                    }
-                    void foreachVertexDo(Tri tri, Action<PSXVertex> action)
-                    {
-                        for (int i = 0; i < tri.Vertexes.Length; i++)
-                        {
-                            action(tri.Vertexes[i]);
-                        }
-                    }
+
                     foreach (Tri tri in exporter.Mesh.Triangles)
                     {
                         int expander = 16 / ((int)tri.Texture.BitDepth);
@@ -336,10 +332,11 @@ namespace SplashEdit.RuntimeCode
                 {
                     AlignToFourBytes(writer);
                     long navmeshDataOffset = writer.BaseStream.Position;
-                    navmeshDataOffsets.Add(navmeshDataOffset);
+                    navmeshOffset.DataOffsets.Add(navmeshDataOffset);
 
                     foreach (PSXNavMeshTri tri in navmesh.Navmesh)
                     {
+                        // Write vertices coordinates
                         writer.Write((int)tri.v0.vx);
                         writer.Write((int)tri.v0.vy);
                         writer.Write((int)tri.v0.vz);
@@ -361,7 +358,7 @@ namespace SplashEdit.RuntimeCode
                     AlignToFourBytes(writer);
                     // Record the current offset for this atlas's data.
                     long atlasDataOffset = writer.BaseStream.Position;
-                    atlasDataOffsets.Add(atlasDataOffset);
+                    atlasOffset.DataOffsets.Add(atlasDataOffset);
 
                     // Write the atlas's raw texture data.
                     for (int y = 0; y < atlas.vramPixels.GetLength(1); y++)
@@ -382,7 +379,7 @@ namespace SplashEdit.RuntimeCode
                         {
                             AlignToFourBytes(writer);
                             long clutDataOffset = writer.BaseStream.Position;
-                            clutDataOffsets.Add(clutDataOffset);
+                            clutOffset.DataOffsets.Add(clutDataOffset);
 
                             foreach (VRAMPixel color in texture.ColorPalette)
                             {
@@ -393,79 +390,32 @@ namespace SplashEdit.RuntimeCode
 
                 }
 
-                // Bacfill the lua data offsets into the metadata section.
-                if (luaOffsetPlaceholderPositions.Count == luaDataOffsets.Count)
-                {
-                    for (int i = 0; i < luaOffsetPlaceholderPositions.Count; i++)
-                    {
-                        writer.Seek((int)luaOffsetPlaceholderPositions[i], SeekOrigin.Begin);
-                        writer.Write((int)luaDataOffsets[i]);
-                    }
-                }
-                else
-                {
-                    Debug.LogError("Mismatch between metadata lua offset placeholders and lua data blocks!");
-                }
-
-                // Backfill the mesh data offsets into the metadata section.
-                if (meshOffsetPlaceholderPositions.Count == meshDataOffsets.Count)
-                {
-                    for (int i = 0; i < meshOffsetPlaceholderPositions.Count; i++)
-                    {
-                        writer.Seek((int)meshOffsetPlaceholderPositions[i], SeekOrigin.Begin);
-                        writer.Write((int)meshDataOffsets[i]);
-                    }
-                }
-                else
-                {
-                    Debug.LogError("Mismatch between metadata mesh offset placeholders and mesh data blocks!");
-                }
-
-                // Backfill the navmesh offsets into the metadata section.
-                if (navmeshOffsetPlaceholderPositions.Count == navmeshDataOffsets.Count)
-                {
-                    for (int i = 0; i < navmeshOffsetPlaceholderPositions.Count; i++)
-                    {
-                        writer.Seek((int)navmeshOffsetPlaceholderPositions[i], SeekOrigin.Begin);
-                        writer.Write((int)navmeshDataOffsets[i]);
-                    }
-                }
-                else
-                {
-                    Debug.LogError("Mismatch between metadata mesh offset placeholders and mesh data blocks!");
-                }
-
-
-                // Backfill the atlas data offsets into the metadata section.
-                if (atlasOffsetPlaceholderPositions.Count == atlasDataOffsets.Count)
-                {
-                    for (int i = 0; i < atlasOffsetPlaceholderPositions.Count; i++)
-                    {
-                        writer.Seek((int)atlasOffsetPlaceholderPositions[i], SeekOrigin.Begin);
-                        writer.Write((int)atlasDataOffsets[i]);
-                    }
-                }
-                else
-                {
-                    Debug.LogError("Mismatch between atlas offset placeholders and atlas data blocks!");
-                }
-
-                // Backfill the clut data offsets into the metadata section.
-                if (clutOffsetPlaceholderPositions.Count == clutDataOffsets.Count)
-                {
-                    for (int i = 0; i < clutOffsetPlaceholderPositions.Count; i++)
-                    {
-                        writer.Seek((int)clutOffsetPlaceholderPositions[i], SeekOrigin.Begin);
-                        writer.Write((int)clutDataOffsets[i]);
-                    }
-                }
-                else
-                {
-                    Debug.LogError("Mismatch between clut offset placeholders and clut data blocks!");
-                }
+                writeOffset(writer, luaOffset, "lua");
+                writeOffset(writer, meshOffset, "mesh");
+                writeOffset(writer, navmeshOffset, "navmesh");
+                writeOffset(writer, atlasOffset, "atlas");
+                writeOffset(writer, clutOffset, "clut");
             }
             Debug.Log(totalFaces);
         }
+
+        private void writeOffset(BinaryWriter writer, OffsetData data, string type)
+        {
+            // Backfill the data offsets into the metadata section.
+            if (data.OffsetPlaceholderPositions.Count == data.DataOffsets.Count)
+            {
+                for (int i = 0; i < data.OffsetPlaceholderPositions.Count; i++)
+                {
+                    writer.Seek((int)data.OffsetPlaceholderPositions[i], SeekOrigin.Begin);
+                    writer.Write((int)data.DataOffsets[i]);
+                }
+            }
+            else
+            {
+                Debug.LogError("Mismatch between clut offset placeholders and clut data blocks!");
+            }
+        }
+
 
         void AlignToFourBytes(BinaryWriter writer)
         {
@@ -482,5 +432,11 @@ namespace SplashEdit.RuntimeCode
             Gizmos.DrawWireCube(sceneOrigin, cubeSize);
         }
 
+    }
+
+    public class OffsetData
+    {
+        public List<long> OffsetPlaceholderPositions = new List<long>();
+        public List<long> DataOffsets = new List<long>();
     }
 }
