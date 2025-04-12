@@ -2,10 +2,14 @@ using UnityEngine;
 
 namespace Splashedit.RuntimeCode
 {
-
-    [CreateAssetMenu(fileName = "NewLuaScript", menuName = "Lua Script", order = 1)]
     public class LuaFile : ScriptableObject
     {
-        public TextAsset luaScript;
+        [SerializeField] private string luaScript;
+        public string LuaScript => luaScript;
+
+        public void Init(string luaCode)
+        {
+            luaScript = luaCode;
+        }
     }
 }
