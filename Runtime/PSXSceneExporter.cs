@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using Splashedit.RuntimeCode;
 using UnityEditor;
 using UnityEngine;
@@ -128,12 +129,12 @@ namespace SplashEdit.RuntimeCode
             // Lua files 
             foreach (PSXObjectExporter exporter in _exporters)
             {
-                if (exporter.luaFile != null)
+                if (exporter.LuaFile != null)
                 {
                     //if not contains
-                    if (!luaFiles.Contains(exporter.luaFile))
+                    if (!luaFiles.Contains(exporter.LuaFile))
                     {
-                        luaFiles.Add(exporter.luaFile);
+                        luaFiles.Add(exporter.LuaFile);
                     }
                 }
             }
@@ -168,7 +169,7 @@ namespace SplashEdit.RuntimeCode
                     // Write placeholder for lua file data offset and record its position.
                     luaOffsetPlaceholderPositions.Add(writer.BaseStream.Position);
                     writer.Write((int)0); // 4-byte placeholder for mesh data offset.
-                    writer.Write((uint)luaFile.luaScript.text.Length);
+                    writer.Write((uint)luaFile.LuaScript.Length);
                 }
 
                 // GameObject section (exporters)
@@ -195,9 +196,9 @@ namespace SplashEdit.RuntimeCode
                     writer.Write((int)rotationMatrix[2, 2]);
 
                     writer.Write((ushort)exporter.Mesh.Triangles.Count);
-                    if (exporter.luaFile != null)
+                    if (exporter.LuaFile != null)
                     {
-                        int index = luaFiles.IndexOf(exporter.luaFile);
+                        int index = luaFiles.IndexOf(exporter.LuaFile);
                         writer.Write((short)index);
                     }
                     else
@@ -257,7 +258,7 @@ namespace SplashEdit.RuntimeCode
                     long luaDataOffset = writer.BaseStream.Position;
                     luaDataOffsets.Add(luaDataOffset);
 
-                    writer.Write(luaFile.luaScript.bytes);
+                    writer.Write(Encoding.UTF8.GetBytes(luaFile.LuaScript));
                 }
 
                 // Mesh data section: Write mesh data for each exporter.

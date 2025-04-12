@@ -1,6 +1,8 @@
 using UnityEngine;
 using System.IO;
+using UnityEditor;
 using UnityEditor.AssetImporters;
+using Splashedit.RuntimeCode;
 
 namespace SplashEdit.EditorCode
 {
@@ -9,9 +11,15 @@ namespace SplashEdit.EditorCode
     {
         public override void OnImportAsset(AssetImportContext ctx)
         {
-            var asset = new TextAsset(File.ReadAllText(ctx.assetPath));
-            ctx.AddObjectToAsset("Text", asset);
-            ctx.SetMainObject(asset);
+            var asset = ScriptableObject.CreateInstance<LuaFile>();
+            var luaCode = File.ReadAllText(ctx.assetPath);
+            asset.Init(luaCode);
+            asset.name = Path.GetFileName(ctx.assetPath);
+            var text = new TextAsset(asset.LuaScript);
+
+            ctx.AddObjectToAsset("Text", text);
+            ctx.AddObjectToAsset("Script", asset);
+            ctx.SetMainObject(text);
         }
     }
 }

@@ -8,13 +8,14 @@ namespace SplashEdit.RuntimeCode
     [RequireComponent(typeof(Renderer))]
     public class PSXObjectExporter : MonoBehaviour
     {
-        public LuaFile luaFile;
+        public LuaFile LuaFile => luaFile;
 
         public List<PSXTexture2D> Textures { get; set; } = new List<PSXTexture2D>(); // Stores the converted PlayStation-style texture
-        public PSXMesh Mesh { get; set; } // Stores the converted PlayStation-style mesh
+        public PSXMesh Mesh { get; protected set; } // Stores the converted PlayStation-style mesh
         [Header("Export Settings")]
         [FormerlySerializedAs("BitDepth")]
         [SerializeField] private PSXBPP bitDepth = PSXBPP.TEX_8BIT; // Defines the bit depth of the texture (e.g., 4BPP, 8BPP)
+        [SerializeField] private LuaFile luaFile;
         [Header("Gizmo Settings")]
         [FormerlySerializedAs("PreviewNormals")]
         [SerializeField] private bool previewNormals = false;
