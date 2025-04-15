@@ -37,7 +37,7 @@ namespace SplashEdit.EditorCode
         };
         private static string[] resolutionsStrings => resolutions.Select(c => $"{c.x}x{c.y}").ToArray();
 
-        [MenuItem("Window/VRAM Editor")]
+        [MenuItem("PSX/VRAM Editor")]
         public static void ShowWindow()
         {
             VRAMEditorWindow window = GetWindow<VRAMEditorWindow>("VRAM Editor");

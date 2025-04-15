@@ -10,5 +10,7 @@ namespace SplashEdit.RuntimeCode
         public bool DualBuffering = true;
         public bool VerticalBuffering = true;
         public List<ProhibitedArea> ProhibitedAreas = new List<ProhibitedArea>();
+
+        public string PCSXReduxPath = "";
     }
 }

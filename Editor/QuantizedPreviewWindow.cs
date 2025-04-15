@@ -17,7 +17,7 @@ namespace SplashEdit.EditorCode
         private PSXBPP bpp = PSXBPP.TEX_4BIT;
         private readonly int previewSize = 256;
 
-        [MenuItem("Window/Quantized Preview")]
+        [MenuItem("PSX/Quantized Preview")]
         public static void ShowWindow()
         {
             // Creates and displays the window
