@@ -1,36 +1,32 @@
 using UnityEngine;
 using System.Diagnostics;
 using System.Linq;
+using System.IO;
+using System;
 
 public static class ToolchainChecker
 {
-    public static readonly string[] requiredTools = new[]
+    public static readonly string[] mipsToolSuffixes = new[]
     {
-        "mipsel-linux-gnu-addr2line",
-        "mipsel-linux-gnu-ar",
-        "mipsel-linux-gnu-as",
-        "mipsel-linux-gnu-cpp",
-        "mipsel-linux-gnu-elfedit",
-        "mipsel-linux-gnu-g++",
-        "mipsel-linux-gnu-gcc",
-        "mipsel-linux-gnu-gcc-ar",
-        "mipsel-linux-gnu-gcc-nm",
-        "mipsel-linux-gnu-gcc-ranlib",
-        "mipsel-linux-gnu-gcov",
-        "mipsel-linux-gnu-ld",
-        "mipsel-linux-gnu-nm",
-        "mipsel-linux-gnu-objcopy",
-        "mipsel-linux-gnu-objdump",
-        "mipsel-linux-gnu-ranlib",
-        "mipsel-linux-gnu-readelf",
-        "mipsel-linux-gnu-size",
-        "mipsel-linux-gnu-strings",
-        "mipsel-linux-gnu-strip"
+        "addr2line", "ar", "as", "cpp", "elfedit", "g++", "gcc", "gcc-ar", "gcc-nm",
+        "gcc-ranlib", "gcov", "ld", "nm", "objcopy", "objdump", "ranlib", "readelf",
+        "size", "strings", "strip"
     };
 
     /// <summary>
-    /// Checks for the availability of a given tool by using a system command.  
-    /// "where" is used on Windows and "which" on other platforms.
+    /// Returns the full tool names to be checked, based on platform.
+    /// </summary>
+    public static string[] GetRequiredTools()
+    {
+        string prefix = Application.platform == RuntimePlatform.WindowsEditor
+            ? "mipsel-none-elf-"
+            : "mipsel-linux-gnu-";
+
+        return mipsToolSuffixes.Select(s => prefix + s).ToArray();
+    }
+
+    /// <summary>
+    /// Checks for availability of any tool (either full name like "make" or "mipsel-*").
     /// </summary>
     public static bool IsToolAvailable(string toolName)
     {
@@ -55,7 +51,22 @@ public static class ToolchainChecker
             string output = process.StandardOutput.ReadToEnd().Trim();
             process.WaitForExit();
 
-            return !string.IsNullOrEmpty(output);
+            if (!string.IsNullOrEmpty(output))
+                return true;
+
+            // Additional fallback for MIPS tools on Windows in local MIPS path
+            if (Application.platform == RuntimePlatform.WindowsEditor &&
+                toolName.StartsWith("mipsel-none-elf-"))
+            {
+                string localMipsBin = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "mips", "mips", "bin");
+
+                string fullPath = Path.Combine(localMipsBin, toolName + ".exe");
+                return File.Exists(fullPath);
+            }
+
+            return false;
         }
         catch
         {

@@ -29,7 +29,7 @@ public class InstallerWindow : EditorWindow
     private void RefreshToolStatus()
     {
         mipsToolStatus.Clear();
-        foreach (var tool in ToolchainChecker.requiredTools)
+        foreach (var tool in ToolchainChecker.GetRequiredTools())
         {
             mipsToolStatus[tool] = ToolchainChecker.IsToolAvailable(tool);
         }
@@ -148,9 +148,12 @@ public class InstallerWindow : EditorWindow
             isInstalling = true;
             EditorUtility.DisplayProgressBar("Installing MIPS Toolchain",
                 "Please wait while the MIPS toolchain is being installed...", 0f);
-            await ToolchainInstaller.InstallToolchain();
+            bool success = await ToolchainInstaller.InstallToolchain();
             EditorUtility.ClearProgressBar();
-            EditorUtility.DisplayDialog("Installation Complete", "MIPS toolchain installed successfully.", "OK");
+            if (success)
+            {
+                EditorUtility.DisplayDialog("Installation Complete", "MIPS toolchain installed successfully.", "OK");
+            }
             RefreshToolStatus(); // Update cached statuses after installation
         }
         catch (System.Exception ex)

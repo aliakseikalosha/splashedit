@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEditor;
+using System.IO;
 
 public static class ToolchainInstaller
 {
@@ -21,11 +22,25 @@ public static class ToolchainInstaller
     {
         var tcs = new TaskCompletionSource<int>();
 
+        if (fileName.Equals("mips", StringComparison.OrdinalIgnoreCase))
+        {
+            fileName = "powershell";
+
+            // Get the AppData\Roaming path for the user
+            string roamingPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData);
+            string scriptPath = Path.Combine(roamingPath, "mips\\mips.ps1");
+
+            // Pass the arguments to the PowerShell script
+            arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" {arguments}"; 
+        }
+
+
         Process process = new Process();
         process.StartInfo.FileName = fileName;
         process.StartInfo.Arguments = arguments;
-        process.StartInfo.CreateNoWindow = true;
-        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = false;
+        process.StartInfo.UseShellExecute = true;
+
         if (!string.IsNullOrEmpty(workingDirectory))
             process.StartInfo.WorkingDirectory = workingDirectory;
 
@@ -50,6 +65,7 @@ public static class ToolchainInstaller
             throw new Exception($"Process '{fileName} {arguments}' exited with code {exitCode}");
     }
 
+
     #region MIPS Toolchain Installation
 
     /// <summary>
@@ -66,7 +82,7 @@ public static class ToolchainInstaller
             await RunCommandAsync("powershell", 
                 "-c \"& { iwr -UseBasicParsing https://raw.githubusercontent.com/grumpycoders/pcsx-redux/main/mips.ps1 | iex }\"");
             EditorUtility.DisplayDialog("Reboot Required", 
-                "Installing the MIPS toolchain requires a reboot. Please reboot your computer before proceeding further.", 
+                "Installing the MIPS toolchain requires a reboot. Please reboot your computer and click the button again.", 
                 "OK");
         }
         catch (Exception ex)
@@ -81,7 +97,7 @@ public static class ToolchainInstaller
     /// Installs the MIPS toolchain based on the current platform.
     /// Uses pkexec on Linux to request graphical elevation.
     /// </summary>
-    public static async Task InstallToolchain()
+    public static async Task<bool> InstallToolchain()
     {
         switch (Application.platform)
         {
@@ -91,10 +107,11 @@ public static class ToolchainInstaller
                     if (!ToolchainChecker.IsToolAvailable("mips"))
                     {
                         await InstallMips();
+                        return false;
                     }
                     else
                     {
-                        if (win32MipsToolsInstalling) return;
+                        if (win32MipsToolsInstalling) return false;
                         win32MipsToolsInstalling = true;
                         await RunCommandAsync("mips", $"install {mipsVersion}");
                     }
@@ -168,6 +185,7 @@ public static class ToolchainInstaller
                     "Your platform is not supported by this extension. Please install the MIPS toolchain manually.", "OK");
                 throw new Exception("Unsupported platform");
         }
+        return true;
     }
 
     #endregion
