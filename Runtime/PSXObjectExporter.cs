@@ -10,6 +10,8 @@ namespace SplashEdit.RuntimeCode
     {
         public LuaFile LuaFile => luaFile;
 
+        public bool IsActive = true;
+
         public List<PSXTexture2D> Textures { get; set; } = new List<PSXTexture2D>(); // Stores the converted PlayStation-style texture
         public PSXMesh Mesh { get; protected set; } // Stores the converted PlayStation-style mesh
         [Header("Export Settings")]

@@ -15,6 +15,7 @@ namespace SplashEdit.RuntimeCode
     {
 
         public float GTEScaling = 100.0f;
+        public LuaFile SceneLuaFile;
 
         private PSXObjectExporter[] _exporters;
         private TextureAtlas[] _atlases;
@@ -132,6 +133,13 @@ namespace SplashEdit.RuntimeCode
                     }
                 }
             }
+            if (SceneLuaFile != null)
+            {
+                if (!luaFiles.Contains(SceneLuaFile))
+                {
+                    luaFiles.Add(SceneLuaFile);
+                }
+            }
 
             using (BinaryWriter writer = new BinaryWriter(File.Open(path, FileMode.Create)))
             {
@@ -154,7 +162,15 @@ namespace SplashEdit.RuntimeCode
 
                 writer.Write((ushort)PSXTrig.ConvertCoordinateToPSX(_playerHeight, GTEScaling));                // 26
 
-                writer.Write((ushort)0);
+                if (SceneLuaFile != null)
+                {
+                    int index = luaFiles.IndexOf(SceneLuaFile);
+                    writer.Write((short)index);
+                }
+                else
+                {
+                    writer.Write((short)-1);
+                }
                 writer.Write((ushort)0);
 
                 // Lua file section
@@ -199,6 +215,10 @@ namespace SplashEdit.RuntimeCode
                     {
                         writer.Write((short)-1);
                     }
+
+                    // Write 4-byte bitfield with LSB as exporter.isActive
+                    int bitfield = exporter.IsActive ? 0b1 : 0b0;
+                    writer.Write(bitfield);
                 }
 
                 // Navmesh metadata section
